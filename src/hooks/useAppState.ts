@@ -19,6 +19,7 @@ function defaultBill(name = 'Bill 1', peopleIds: string[] = []): Bill {
     peopleIds,
     paidBy: undefined,
     scannedTotal: undefined,
+    settledAmounts: undefined,
   };
 }
 
@@ -56,6 +57,7 @@ function migrateLegacy(parsed: Record<string, unknown>): AppState {
     peopleIds: people.map((p) => p.id),
     paidBy: undefined,
     scannedTotal: undefined,
+    settledAmounts: undefined,
   };
   return {
     people,
@@ -86,6 +88,10 @@ function load(): AppState {
         peopleIds: Array.isArray(b.peopleIds) ? (b.peopleIds as string[]) : people.map((p) => p.id),
         paidBy: typeof b.paidBy === 'string' ? b.paidBy : undefined,
         scannedTotal: typeof b.scannedTotal === 'number' ? b.scannedTotal : undefined,
+        settledAmounts:
+          b.settledAmounts && typeof b.settledAmounts === 'object'
+            ? (b.settledAmounts as Record<string, number>)
+            : undefined,
       }));
       const activeBillId = bills.some((b) => b.id === parsed.activeBillId)
         ? (parsed.activeBillId as string)

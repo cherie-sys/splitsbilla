@@ -48,8 +48,15 @@ function App() {
     }));
   }
 
+  function pruneSettledAmounts(settledAmounts: Record<string, number> | undefined, removed: Set<string>) {
+    if (!settledAmounts) return settledAmounts;
+    const entries = Object.entries(settledAmounts).filter(([id]) => !removed.has(id));
+    return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+  }
+
   // Deleting someone from the roster removes them everywhere: every bill's
-  // people list, whoever they were assigned items in, and "paid by" if it was them.
+  // people list, whoever they were assigned items in, "paid by" if it was
+  // them, and any settlement recorded against their debt.
   function handleRosterChange(newRoster: Person[]) {
     setState((s) => {
       const removedIds = s.people.filter((p) => !newRoster.some((np) => np.id === p.id)).map((p) => p.id);
@@ -64,14 +71,16 @@ function App() {
           ...it,
           assignedTo: it.assignedTo.filter((id) => !removed.has(id)),
         })),
+        settledAmounts: pruneSettledAmounts(b.settledAmounts, removed),
       }));
       return { ...s, people: newRoster, bills };
     });
   }
 
   // Un-checking someone from this bill (without deleting them from the roster) must also
-  // drop their share of any item and clear "paid by" if it was them — otherwise their
-  // slice of the cost quietly disappears from the total instead of being reassigned.
+  // drop their share of any item, clear "paid by" if it was them, and clear any
+  // settlement recorded against their debt — otherwise their slice of the cost
+  // quietly disappears from the total instead of being reassigned.
   function handleBillPeopleChange(peopleIds: string[]) {
     updateActiveBill((bill) => {
       const removed = bill.peopleIds.filter((id) => !peopleIds.includes(id));
@@ -84,6 +93,7 @@ function App() {
           ...it,
           assignedTo: it.assignedTo.filter((id) => !removedSet.has(id)),
         })),
+        settledAmounts: pruneSettledAmounts(bill.settledAmounts, removedSet),
       };
     });
   }
@@ -172,6 +182,17 @@ function App() {
       const activeBillId = bills.some((b) => b.id === s.activeBillId) ? s.activeBillId : bills[0].id;
       return { ...s, bills, activeBillId };
     });
+  }
+
+  function handleSettleDebt(billId: string, personId: string, settled: number) {
+    setState((s) => ({
+      ...s,
+      bills: s.bills.map((b) =>
+        b.id === billId
+          ? { ...b, settledAmounts: { ...(b.settledAmounts ?? {}), [personId]: settled } }
+          : b,
+      ),
+    }));
   }
 
   const hasScanData = activeBill.receiptImages.length > 0 || activeBill.items.some((it) => it.sourceImageId);
@@ -273,8 +294,18 @@ function App() {
         {step === 3 && (
           <section className="panel">
             <h2>Who owes what — {activeBill.name}</h2>
-            <SummaryPanel bill={activeBill} people={billPeople} currency={state.currency} />
-            <CombinedSummary bills={state.bills} people={involvedPeople} currency={state.currency} />
+            <SummaryPanel
+              bill={activeBill}
+              people={billPeople}
+              currency={state.currency}
+              onSettle={(personId, settled) => handleSettleDebt(activeBill.id, personId, settled)}
+            />
+            <CombinedSummary
+              bills={state.bills}
+              people={involvedPeople}
+              currency={state.currency}
+              onSettleDebt={handleSettleDebt}
+            />
             <ExportPanel state={state} bill={activeBill} people={billPeople} />
           </section>
         )}

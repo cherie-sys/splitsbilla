@@ -54,18 +54,6 @@ export default function ExportPanel({ state, bill, people }: Props) {
     }
   }
 
-  function handleDownload() {
-    const blob = new Blob([text], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${title.replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '') || 'settlement'}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  }
-
   return (
     <div className="export-panel">
       <h3>Export settlement</h3>
@@ -92,7 +80,7 @@ export default function ExportPanel({ state, bill, people }: Props) {
       <pre className="export-preview">{text}</pre>
 
       <div className="export-actions">
-        <button type="button" className="btn" onClick={handleCopy}>
+        <button type="button" className="btn primary" onClick={handleCopy}>
           {copied ? 'Copied ✓' : 'Copy'}
         </button>
         {canShare && (
@@ -100,9 +88,6 @@ export default function ExportPanel({ state, bill, people }: Props) {
             Share
           </button>
         )}
-        <button type="button" className="btn primary" onClick={handleDownload}>
-          Download .txt
-        </button>
       </div>
 
       <div className="share-link-section">

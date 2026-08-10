@@ -1,19 +1,22 @@
 import type { Bill, Person } from '../types';
-import { billTotal, computeTotals, formatCurrency, unassignedItems } from '../lib/split';
+import { billCollected, billTotal, computeTotals, formatCurrency, settledAmount, unassignedItems } from '../lib/split';
+import SettlementControl from './SettlementControl';
 
 interface Props {
   bill: Bill;
   people: Person[];
   currency: string;
+  onSettle: (personId: string, settled: number) => void;
 }
 
 const TOLERANCE = 0.01;
 
-export default function SummaryPanel({ bill, people, currency }: Props) {
+export default function SummaryPanel({ bill, people, currency, onSettle }: Props) {
   const totals = computeTotals(bill, people);
   const missing = unassignedItems(bill.items);
   const total = billTotal(bill);
   const payer = people.find((p) => p.id === bill.paidBy);
+  const collected = payer ? billCollected(bill, people) : 0;
   const diff = bill.scannedTotal !== undefined ? total - bill.scannedTotal : null;
   const mismatched = diff !== null && Math.abs(diff) > TOLERANCE;
 
@@ -52,10 +55,18 @@ export default function SummaryPanel({ bill, people, currency }: Props) {
                   (isPayer ? (
                     <span className="owes-line">
                       paid {formatCurrency(total, currency)} · gets back{' '}
-                      {formatCurrency(total - t.total, currency)}
+                      {formatCurrency(Math.max(0, total - t.total - collected), currency)}
                     </span>
                   ) : (
-                    <span className="owes-line">owes {payer.name}</span>
+                    <>
+                      <span className="owes-line">owes {payer.name}</span>
+                      <SettlementControl
+                        amount={t.total}
+                        settled={settledAmount(bill, t.personId)}
+                        currency={currency}
+                        onChange={(settled) => onSettle(t.personId, settled)}
+                      />
+                    </>
                   ))}
               </div>
               <div className="summary-breakdown">

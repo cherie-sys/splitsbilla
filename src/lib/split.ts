@@ -103,6 +103,16 @@ export function billTotal(bill: Bill): number {
   return subtotal(bill.items) + bill.charges.tax + resolveTipAmount(bill) - bill.charges.discount;
 }
 
+// How much a debtor has already paid back toward their share of this bill.
+export function settledAmount(bill: Bill, personId: string): number {
+  return Math.max(0, bill.settledAmounts?.[personId] ?? 0);
+}
+
+// How much the payer has collected back so far across everyone on this bill.
+export function billCollected(bill: Bill, people: Person[]): number {
+  return people.reduce((sum, p) => sum + settledAmount(bill, p.id), 0);
+}
+
 // Aggregates every bill in the event into one per-person total, so the
 // group can see what's owed across the whole trip/occasion, not just one bill.
 export function computeCombinedTotals(bills: Bill[], people: Person[]): PersonTotal[] {
@@ -130,20 +140,51 @@ export function combinedBillTotal(bills: Bill[]): number {
   return bills.reduce((sum, bill) => sum + billTotal(bill), 0);
 }
 
-// Net balance per person across every bill: what they fronted (as the payer
-// of a bill) minus what they actually owe (their share of every bill).
-// Positive = the group owes them; negative = they owe the group.
+export interface BillDebt {
+  billId: string;
+  billName: string;
+  debtorId: string;
+  creditorId: string;
+  amount: number; // full amount owed for this bill (unaffected by settlement)
+  settled: number; // amount already paid back
+  remaining: number; // amount still owed — max(0, amount - settled)
+}
+
+// Explicit pairwise "who owes who, for which bill" — one entry per non-payer
+// with a nonzero share, for every bill that has a payer set. Kept even once
+// fully settled (remaining === 0) so there's a visible record it was paid,
+// rather than the line just disappearing.
+export function perBillDebts(bills: Bill[], people: Person[]): BillDebt[] {
+  const debts: BillDebt[] = [];
+  for (const bill of bills) {
+    if (!bill.paidBy) continue;
+    for (const t of computeTotals(bill, people)) {
+      if (t.personId === bill.paidBy || t.total <= 0.005) continue;
+      const settled = Math.min(t.total, settledAmount(bill, t.personId));
+      debts.push({
+        billId: bill.id,
+        billName: bill.name,
+        debtorId: t.personId,
+        creditorId: bill.paidBy,
+        amount: t.total,
+        settled,
+        remaining: Math.max(0, t.total - settled),
+      });
+    }
+  }
+  return debts;
+}
+
+// Net balance per person across every bill, after settlement: what's still
+// owed to them (as payer) minus what they still owe (as debtor). Positive =
+// the group owes them; negative = they owe the group. Zero once fully settled.
 export function computeNetBalances(bills: Bill[], people: Person[]): Map<string, number> {
   const balances = new Map<string, number>();
   for (const person of people) balances.set(person.id, 0);
 
-  for (const bill of bills) {
-    if (!bill.paidBy) continue;
-    balances.set(bill.paidBy, (balances.get(bill.paidBy) ?? 0) + billTotal(bill));
-  }
-
-  for (const t of computeCombinedTotals(bills, people)) {
-    balances.set(t.personId, (balances.get(t.personId) ?? 0) - t.total);
+  for (const debt of perBillDebts(bills, people)) {
+    balances.set(debt.debtorId, (balances.get(debt.debtorId) ?? 0) - debt.remaining);
+    balances.set(debt.creditorId, (balances.get(debt.creditorId) ?? 0) + debt.remaining);
   }
 
   return balances;

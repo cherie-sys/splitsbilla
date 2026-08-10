@@ -258,6 +258,50 @@
   margin: 0 0 10px;
 }
 
+.event-debts {
+  margin-bottom: 18px;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+
+.event-debts h4 {
+  font-size: 12px;
+  opacity: 0.6;
+  font-weight: 600;
+  margin: 0 0 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.debts-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.debts-list li {
+  font-size: 13px;
+}
+
+.debt-row-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.debt-bill-tag {
+  flex: 0 0 auto;
+  font-size: 11px;
+  opacity: 0.55;
+  white-space: nowrap;
+}
+
 /* Export */
 .export-panel {
   margin-top: 24px;
@@ -937,6 +981,58 @@
   font-size: 12px;
   font-weight: 600;
   color: var(--accent);
+}
+
+.settlement-control {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.settlement-status {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.remaining-amount {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.settled-so-far {
+  font-size: 11px;
+  padding: 0;
+}
+
+.settled-badge {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--success, #4caf7d);
+}
+
+.settlement-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.settlement-actions input {
+  width: 90px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: inherit;
+  font-size: 12px;
+}
+
+.settlement-actions .btn {
+  padding: 6px 10px;
+  font-size: 12px;
 }
 
 .summary-breakdown {
