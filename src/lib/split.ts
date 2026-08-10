@@ -103,16 +103,6 @@ export function billTotal(bill: Bill): number {
   return subtotal(bill.items) + bill.charges.tax + resolveTipAmount(bill) - bill.charges.discount;
 }
 
-// How much a debtor has already paid back toward their share of this bill.
-export function settledAmount(bill: Bill, personId: string): number {
-  return Math.max(0, bill.settledAmounts?.[personId] ?? 0);
-}
-
-// How much the payer has collected back so far across everyone on this bill.
-export function billCollected(bill: Bill, people: Person[]): number {
-  return people.reduce((sum, p) => sum + settledAmount(bill, p.id), 0);
-}
-
 // Aggregates every bill in the event into one per-person total, so the
 // group can see what's owed across the whole trip/occasion, not just one bill.
 export function computeCombinedTotals(bills: Bill[], people: Person[]): PersonTotal[] {
@@ -145,49 +135,75 @@ export interface BillDebt {
   billName: string;
   debtorId: string;
   creditorId: string;
-  amount: number; // full amount owed for this bill (unaffected by settlement)
-  settled: number; // amount already paid back
-  remaining: number; // amount still owed — max(0, amount - settled)
+  amount: number;
 }
 
 // Explicit pairwise "who owes who, for which bill" — one entry per non-payer
-// with a nonzero share, for every bill that has a payer set. Kept even once
-// fully settled (remaining === 0) so there's a visible record it was paid,
-// rather than the line just disappearing.
+// with a nonzero share, for every bill that has a payer set. This is what
+// makes computeNetBalances's aggregate position traceable back to a specific
+// bill: every bill passed in is covered, as long as it has a payer set.
 export function perBillDebts(bills: Bill[], people: Person[]): BillDebt[] {
   const debts: BillDebt[] = [];
   for (const bill of bills) {
     if (!bill.paidBy) continue;
     for (const t of computeTotals(bill, people)) {
       if (t.personId === bill.paidBy || t.total <= 0.005) continue;
-      const settled = Math.min(t.total, settledAmount(bill, t.personId));
       debts.push({
         billId: bill.id,
         billName: bill.name,
         debtorId: t.personId,
         creditorId: bill.paidBy,
         amount: t.total,
-        settled,
-        remaining: Math.max(0, t.total - settled),
       });
     }
   }
   return debts;
 }
 
-// Net balance per person across every bill, after settlement: what's still
-// owed to them (as payer) minus what they still owe (as debtor). Positive =
-// the group owes them; negative = they owe the group. Zero once fully settled.
+// Net balance per person across every bill: what they fronted (as the payer
+// of a bill) minus what they actually owe (their share of every bill).
+// Positive = the group owes them; negative = they owe the group.
 export function computeNetBalances(bills: Bill[], people: Person[]): Map<string, number> {
   const balances = new Map<string, number>();
   for (const person of people) balances.set(person.id, 0);
 
   for (const debt of perBillDebts(bills, people)) {
-    balances.set(debt.debtorId, (balances.get(debt.debtorId) ?? 0) - debt.remaining);
-    balances.set(debt.creditorId, (balances.get(debt.creditorId) ?? 0) + debt.remaining);
+    balances.set(debt.debtorId, (balances.get(debt.debtorId) ?? 0) - debt.amount);
+    balances.set(debt.creditorId, (balances.get(debt.creditorId) ?? 0) + debt.amount);
   }
 
   return balances;
+}
+
+export interface PairDebt {
+  debtorId: string;
+  creditorId: string;
+  amount: number;
+}
+
+// Simplifies every per-bill debt into one net figure per pair of people,
+// across the whole event. If Charlie owes Ana on one bill and Ana owes
+// Charlie on another, this nets those against each other into a single
+// "who actually owes who" line instead of two separate, partly-cancelling
+// ones — the combined, event-wide picture the per-bill list doesn't show.
+export function combinedPairDebts(bills: Bill[], people: Person[]): PairDebt[] {
+  const net = new Map<string, number>(); // key "idA|idB" (idA < idB) -> amount idA owes idB (negative = idB owes idA)
+
+  for (const debt of perBillDebts(bills, people)) {
+    const [a, b] = [debt.debtorId, debt.creditorId];
+    const aFirst = a < b;
+    const key = aFirst ? `${a}|${b}` : `${b}|${a}`;
+    const signed = aFirst ? debt.amount : -debt.amount;
+    net.set(key, (net.get(key) ?? 0) + signed);
+  }
+
+  const result: PairDebt[] = [];
+  for (const [key, amount] of net) {
+    if (Math.abs(amount) <= 0.005) continue;
+    const [idA, idB] = key.split('|');
+    result.push(amount > 0 ? { debtorId: idA, creditorId: idB, amount } : { debtorId: idB, creditorId: idA, amount: -amount });
+  }
+  return result;
 }
 
 export function formatCurrency(value: number, currency: string = 'USD'): string {

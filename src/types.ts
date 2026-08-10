@@ -44,7 +44,6 @@ export interface Bill {
   peopleIds: string[]; // subset of AppState.people who are part of this bill
   paidBy?: string; // person id who fronted the money for this bill
   scannedTotal?: number; // the total as printed on the receipt (OCR-detected or typed in), for reconciliation
-  settledAmounts?: Record<string, number>; // debtor personId -> amount already paid back to paidBy, for this bill
 }
 
 // The major event that groups several bills together (e.g. a trip or weekend).

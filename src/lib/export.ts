@@ -1,16 +1,15 @@
 import type { AppState, Bill, Person } from '../types';
 import { formatDate } from './util';
 import {
-  billCollected,
   billTotal,
   combinedBillTotal,
+  combinedPairDebts,
   computeCombinedTotals,
   computeNetBalances,
   computeTotals,
   formatCurrency,
   itemPersonShares,
   lineTotal,
-  settledAmount,
 } from './split';
 
 function personName(people: Person[], id: string): string {
@@ -50,7 +49,6 @@ export function buildBillReport(bill: Bill, people: Person[], currency: string):
 
   const totals = computeTotals(bill, people);
   const total = billTotal(bill);
-  const collected = payer ? billCollected(bill, people) : 0;
   for (const t of totals) {
     const person = people.find((p) => p.id === t.personId);
     if (!person) continue;
@@ -64,22 +62,11 @@ export function buildBillReport(bill: Bill, people: Person[], currency: string):
     if (t.tipShare > 0.005) lines.push(`    - Tip: ${formatCurrency(t.tipShare, currency)}`);
     if (t.discountShare > 0.005) lines.push(`    - Discount: −${formatCurrency(t.discountShare, currency)}`);
     if (payer) {
-      if (payer.id === t.personId) {
-        const getsBack = Math.max(0, total - t.total - collected);
-        lines.push(`    (paid ${formatCurrency(total, currency)}, gets back ${formatCurrency(getsBack, currency)})`);
-      } else {
-        const settled = settledAmount(bill, t.personId);
-        const remaining = Math.max(0, t.total - settled);
-        if (remaining <= 0.005) {
-          lines.push(`    (settled with ${payer.name})`);
-        } else if (settled > 0.005) {
-          lines.push(
-            `    (owes ${payer.name} ${formatCurrency(remaining, currency)} — ${formatCurrency(settled, currency)} already paid)`,
-          );
-        } else {
-          lines.push(`    (owes ${payer.name})`);
-        }
-      }
+      lines.push(
+        payer.id === t.personId
+          ? `    (paid ${formatCurrency(total, currency)}, gets back ${formatCurrency(total - t.total, currency)})`
+          : `    (owes ${payer.name})`,
+      );
     }
   }
   lines.push('');
@@ -117,6 +104,18 @@ export function buildEventReport(state: AppState): string {
     lines.push('='.repeat(30));
     lines.push(`Whole event — ${bills.length} bills combined`);
     lines.push('');
+
+    const pairDebts = combinedPairDebts(bills, involved);
+    if (pairDebts.length > 0) {
+      lines.push('Who owes who (combined, all events):');
+      for (const d of pairDebts) {
+        const debtor = involved.find((p) => p.id === d.debtorId);
+        const creditor = involved.find((p) => p.id === d.creditorId);
+        lines.push(`  ${debtor?.name} owes ${creditor?.name} ${formatCurrency(d.amount, currency)}`);
+      }
+      lines.push('');
+    }
+
     const combined = computeCombinedTotals(bills, involved);
     const balances = computeNetBalances(bills, involved);
     for (const t of combined) {
