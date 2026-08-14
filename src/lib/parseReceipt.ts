@@ -35,12 +35,16 @@ const DECIMAL_MONEY_RE = /\d{1,6}[.,]\d{2}/g;
 const WHOLE_MONEY_TRAILING_RE = /(?<!\d)(\d{2,6})\D*$/;
 
 const SKIP_NOISE_RE =
-  /\b(cash|change|visa|mastercard|amex|discover|debit|credit|card ending|approval|auth code|thank you|receipt|table|server|host|guest|order\s*#|check\s*#|xxxx|items sold|qty|www\.|http|date|time|phone|tel|bill\s*no|invoice|token|covers?|pax|gstin|fssai|kot)\b/i;
+  /\b(cash|change|visa|mastercard|amex|discover|debit|credit|card ending|approval|auth code|thank you|receipt|table|server|host|guest|order\s*#|check\s*#|xxxx|items sold|qty|www\.|http|date|time|phone|tel|bill\s*no|invoice|token|covers?|pax|gstin|fssai|kot|dine\s*in|round\s*-?\s*off|rounding)\b/i;
 
 // CGST/SGST/IGST are India's split GST tax lines; VAT covers several other countries
 const TAX_RE = /\btax\b|\b[csi]?gst\b|\bvat\b/i;
 const TIP_RE = /\b(tip|gratuity|service\s*charge)\b/i;
 const SUBTOTAL_RE = /\bsub\s*-?\s*total\b/i;
+// "Total Qty: 11" marks the end of the itemized list on most POS receipts —
+// it's excluded from TOTAL_RE (below) specifically so it doesn't get read as
+// a money total, but it's still useful as a boundary marker.
+const TOTAL_QTY_RE = /\btotal\s*qty\b/i;
 // several receipts never print the word "total" alone — "balance due" and
 // "amount due" mean the same thing and were previously (wrongly) filtered as noise
 // negative lookahead excludes "Total Qty: 77" style lines — that's a count, not money
@@ -88,6 +92,11 @@ export function parseReceiptText(rawText: string): ParsedReceipt {
   let suggestedTax: number | undefined;
   let suggestedTip: number | undefined;
   let suggestedTotal: number | undefined;
+  // Once we hit the first subtotal/tax/tip/total-style line, the itemized
+  // section is over. Nothing below that point — round-off adjustments,
+  // payment/change lines, footers — is ever a real item, no matter how much
+  // a stray number on that line makes it look like one.
+  let pastItemsSection = false;
 
   for (const rawLine of lines) {
     let line = rawLine;
@@ -109,22 +118,35 @@ export function parseReceiptText(rawText: string): ParsedReceipt {
     const moneyMatches = findMoneyMatches(line);
     if (moneyMatches.length === 0) continue;
 
-    if (SUBTOTAL_RE.test(line)) continue;
+    if (SUBTOTAL_RE.test(line)) {
+      pastItemsSection = true;
+      continue;
+    }
+    if (TOTAL_QTY_RE.test(line)) {
+      pastItemsSection = true;
+      continue;
+    }
     if (TAX_RE.test(line)) {
       // sum rather than overwrite — receipts often split tax across two lines
       // (e.g. India's CGST + SGST), and each should add to the total, not replace it
+      pastItemsSection = true;
       suggestedTax = (suggestedTax ?? 0) + toNumber(moneyMatches[moneyMatches.length - 1][0]);
       continue;
     }
     if (TIP_RE.test(line)) {
+      pastItemsSection = true;
       suggestedTip = (suggestedTip ?? 0) + toNumber(moneyMatches[moneyMatches.length - 1][0]);
       continue;
     }
     if (TOTAL_RE.test(line)) {
+      pastItemsSection = true;
       suggestedTotal = toNumber(moneyMatches[moneyMatches.length - 1][0]);
       continue;
     }
     if (SKIP_NOISE_RE.test(line)) continue;
+    // anything past the summary section is never an item, however item-shaped it looks
+    // (e.g. "Round off +0.50" has letters, a plausible price, and no keyword match)
+    if (pastItemsSection) continue;
 
     const lastMoney = moneyMatches[moneyMatches.length - 1];
     // a genuine price sits at the end of the line, maybe followed by a currency
