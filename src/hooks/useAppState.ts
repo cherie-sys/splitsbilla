@@ -35,6 +35,7 @@ function freshState(): AppState {
     event: defaultEvent(),
     bills: [bill],
     activeBillId: bill.id,
+    ownerContact: undefined,
   };
 }
 
@@ -101,6 +102,7 @@ function load(): AppState {
         event: { name: eventInfo?.name || 'New event', startDate, endDate },
         bills,
         activeBillId,
+        ownerContact: typeof parsed.ownerContact === 'string' ? parsed.ownerContact : undefined,
       };
     }
 

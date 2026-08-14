@@ -7,11 +7,12 @@ interface Props {
   state: AppState;
   bill: Bill;
   people: Person[]; // bill-scoped people
+  onOwnerContactChange: (ownerContact: string) => void;
 }
 
 const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
 
-export default function ExportPanel({ state, bill, people }: Props) {
+export default function ExportPanel({ state, bill, people, onOwnerContactChange }: Props) {
   const [scope, setScope] = useState<'bill' | 'event'>('bill');
   const [copied, setCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
@@ -22,7 +23,9 @@ export default function ExportPanel({ state, bill, people }: Props) {
 
   const shareUrl = useMemo(() => {
     const snapshot =
-      scope === 'event' ? buildEventSnapshot(state) : buildBillSnapshot(bill, people, state.currency);
+      scope === 'event'
+        ? buildEventSnapshot(state)
+        : buildBillSnapshot(bill, people, state.currency, state.ownerContact);
     return buildShareUrl(snapshot);
   }, [scope, state, bill, people]);
 
@@ -94,10 +97,18 @@ export default function ExportPanel({ state, bill, people }: Props) {
         <h3>Shareable link</h3>
         <p className="hint">
           Anyone with this link can view the settlement above — no login needed. It's a snapshot
-          from right now, not a live view: it won't update if you change the bill later, and
-          there's no way for them to edit it in the app — they'd need to message you their
-          suggestion the normal way.
+          from right now, not a live view: it won't update if you change the bill later.
         </p>
+        <label className="owner-contact-label">
+          Your email (optional) — lets viewers raise a dispute straight to you
+          <input
+            type="email"
+            className="owner-contact-input"
+            placeholder="you@example.com"
+            value={state.ownerContact ?? ''}
+            onChange={(e) => onOwnerContactChange(e.target.value)}
+          />
+        </label>
         <div className="share-link-row">
           <input
             type="text"
@@ -110,10 +121,6 @@ export default function ExportPanel({ state, bill, people }: Props) {
             {linkCopied ? 'Copied ✓' : 'Copy link'}
           </button>
         </div>
-        <p className="hint share-link-note">
-          Note: this link only opens correctly once SplitsBilla is hosted somewhere public — right
-          now it points at this local dev server.
-        </p>
       </div>
     </div>
   );

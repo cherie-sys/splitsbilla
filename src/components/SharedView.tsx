@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { SharedSnapshot } from '../lib/share';
 
 interface Props {
@@ -12,8 +13,30 @@ function money(value: number, currency: string): string {
   }
 }
 
+// Opens the viewer's own email app with a pre-filled draft — nothing is sent
+// automatically, they still have to hit send themselves. No accounts, no
+// backend: this is as close to "raise a dispute" as a static link can get.
+function buildDisputeMailto(snapshot: SharedSnapshot, name: string, message: string): string {
+  const to = (snapshot.ownerContact ?? '').trim();
+  const subject = `Dispute — ${snapshot.title}`;
+  const bodyLines = [
+    name.trim() ? `From: ${name.trim()}` : null,
+    '',
+    message.trim() || '(no message written)',
+    '',
+    `Reference: ${window.location.href}`,
+    '',
+    '— sent via SplitsBilla',
+  ].filter((l): l is string => l !== null);
+  const body = bodyLines.join('\n');
+  return `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
 export default function SharedView({ snapshot }: Props) {
   const { currency } = snapshot;
+  const [showDisputeForm, setShowDisputeForm] = useState(false);
+  const [disputeName, setDisputeName] = useState('');
+  const [disputeMessage, setDisputeMessage] = useState('');
 
   return (
     <div className="app-shell">
@@ -93,6 +116,59 @@ export default function SharedView({ snapshot }: Props) {
             This is a snapshot from when the link was made — it won't update if the bill changes
             afterward.
           </p>
+
+          <div className="dispute-section">
+            {!showDisputeForm ? (
+              <button type="button" className="btn danger-outline" onClick={() => setShowDisputeForm(true)}>
+                Raise a dispute
+              </button>
+            ) : (
+              <div className="dispute-form">
+                <h3 className="bills-heading">Raise a dispute</h3>
+                <p className="hint">
+                  This opens a draft in your own email app, addressed to whoever shared this link —
+                  nothing is sent until you hit send there.
+                </p>
+                {!snapshot.ownerContact && (
+                  <p className="hint">
+                    They didn't add a contact email to this link, so you'll need to fill in the
+                    recipient yourself once your email app opens.
+                  </p>
+                )}
+                <label className="owner-contact-label">
+                  Your name (optional)
+                  <input
+                    type="text"
+                    className="owner-contact-input"
+                    value={disputeName}
+                    onChange={(e) => setDisputeName(e.target.value)}
+                    placeholder="Your name"
+                  />
+                </label>
+                <label className="owner-contact-label">
+                  What's the issue?
+                  <textarea
+                    className="dispute-message-input"
+                    value={disputeMessage}
+                    onChange={(e) => setDisputeMessage(e.target.value)}
+                    placeholder="e.g. I think I was charged for an item I didn't have"
+                    rows={4}
+                  />
+                </label>
+                <div className="export-actions">
+                  <a
+                    className="btn primary"
+                    href={buildDisputeMailto(snapshot, disputeName, disputeMessage)}
+                  >
+                    Open email to send →
+                  </a>
+                  <button type="button" className="btn" onClick={() => setShowDisputeForm(false)}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </section>
       </main>
     </div>

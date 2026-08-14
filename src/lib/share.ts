@@ -35,6 +35,7 @@ export interface SharedBillSnapshot {
   items: SharedItem[];
   people: SharedPerson[];
   total: number;
+  ownerContact?: string; // email to raise a dispute to, if the owner set one
 }
 
 export interface SharedEventSnapshot {
@@ -45,11 +46,17 @@ export interface SharedEventSnapshot {
   bills: { name: string; date: string; total: number }[];
   people: SharedPerson[];
   total: number;
+  ownerContact?: string; // email to raise a dispute to, if the owner set one
 }
 
 export type SharedSnapshot = SharedBillSnapshot | SharedEventSnapshot;
 
-export function buildBillSnapshot(bill: Bill, people: Person[], currency: string): SharedBillSnapshot {
+export function buildBillSnapshot(
+  bill: Bill,
+  people: Person[],
+  currency: string,
+  ownerContact?: string,
+): SharedBillSnapshot {
   const payer = people.find((p) => p.id === bill.paidBy);
   const total = billTotal(bill);
   const totals = computeTotals(bill, people);
@@ -82,11 +89,12 @@ export function buildBillSnapshot(bill: Bill, people: Person[], currency: string
       };
     }),
     total,
+    ownerContact: ownerContact || undefined,
   };
 }
 
 export function buildEventSnapshot(state: AppState): SharedEventSnapshot {
-  const { event, bills, people, currency } = state;
+  const { event, bills, people, currency, ownerContact } = state;
   const involved = people.filter((p) => bills.some((b) => b.peopleIds.includes(p.id)));
   const combined = computeCombinedTotals(bills, involved);
   const balances = computeNetBalances(bills, involved);
@@ -119,6 +127,7 @@ export function buildEventSnapshot(state: AppState): SharedEventSnapshot {
       };
     }),
     total: combinedBillTotal(bills),
+    ownerContact: ownerContact || undefined,
   };
 }
 

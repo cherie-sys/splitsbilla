@@ -59,6 +59,7 @@ export interface AppState {
   event: EventInfo;
   bills: Bill[];
   activeBillId: string;
+  ownerContact?: string; // your own email, embedded in shareable links so viewers can raise a dispute
 }
 
 export interface PersonTotal {

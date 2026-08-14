@@ -275,7 +275,12 @@ function App() {
             <h2>Who owes what — {activeBill.name}</h2>
             <SummaryPanel bill={activeBill} people={billPeople} currency={state.currency} />
             <CombinedSummary bills={state.bills} people={involvedPeople} currency={state.currency} />
-            <ExportPanel state={state} bill={activeBill} people={billPeople} />
+            <ExportPanel
+              state={state}
+              bill={activeBill}
+              people={billPeople}
+              onOwnerContactChange={(ownerContact) => setState((s) => ({ ...s, ownerContact }))}
+            />
           </section>
         )}
       </main>

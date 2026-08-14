@@ -365,6 +365,32 @@
   margin-top: 6px;
 }
 
+.owner-contact-label {
+  display: block;
+  font-size: 13px;
+  opacity: 0.8;
+  margin: 10px 0;
+}
+
+.owner-contact-input,
+.dispute-message-input {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: inherit;
+  font-size: 14px;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.dispute-message-input {
+  resize: vertical;
+}
+
 /* Shared read-only view */
 .shared-subtitle {
   margin-bottom: 16px;
@@ -401,6 +427,19 @@
   padding-top: 12px;
   border-top: 1px dashed var(--border);
   text-align: center;
+}
+
+.dispute-section {
+  margin-top: 16px;
+  text-align: center;
+}
+
+.dispute-form {
+  text-align: left;
+  margin-top: 8px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
 }
 
 .hint {
