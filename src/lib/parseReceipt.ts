@@ -58,6 +58,14 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
+// e.g. "Item          Qty.  Price  Amount" — the column header row printed
+// just above the item list on most POS receipts. When one is found, it's an
+// unambiguous boundary: nothing above it (address, date, bill/token/GST
+// numbers) is ever an item, no matter how item-shaped it looks.
+function isItemHeaderLine(line: string): boolean {
+  return /\bitems?\b/i.test(line) && /\b(qty|price|amount|rate)\b/i.test(line);
+}
+
 function stripTrailingSeparators(s: string): string {
   // strip trailing punctuation, then a trailing currency word/symbol left over from
   // something like "Masala Papad Rs." once the price itself has been split off
@@ -97,8 +105,20 @@ export function parseReceiptText(rawText: string): ParsedReceipt {
   // payment/change lines, footers — is ever a real item, no matter how much
   // a stray number on that line makes it look like one.
   let pastItemsSection = false;
+  // Symmetric guard for the top of the receipt: if there's a recognizable
+  // "Item / Qty / Price" column header anywhere, nothing before it (address,
+  // date, bill/token/GST numbers) can be an item either. Receipts that don't
+  // print such a header never set this — items are then read from the top as
+  // before, so this only ever adds a restriction, never removes coverage.
+  const hasItemHeader = lines.some(isItemHeaderLine);
+  let itemsSectionStarted = !hasItemHeader;
 
   for (const rawLine of lines) {
+    if (!itemsSectionStarted) {
+      if (isItemHeaderLine(rawLine)) itemsSectionStarted = true;
+      continue;
+    }
+
     let line = rawLine;
 
     let serialNo: number | undefined;

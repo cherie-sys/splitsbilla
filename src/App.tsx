@@ -11,6 +11,7 @@ import CombinedSummary from './components/CombinedSummary';
 import ExportPanel from './components/ExportPanel';
 import CurrencySelector from './components/CurrencySelector';
 import SharedView from './components/SharedView';
+import ConfirmDialog from './components/ConfirmDialog';
 import { useAppState, newBill } from './hooks/useAppState';
 import { makeId } from './lib/util';
 import { billTotal, subtotal } from './lib/split';
@@ -25,6 +26,7 @@ function App() {
   const [state, setState] = useAppState();
   const [step, setStep] = useState<number>(0);
   const [scanMessage, setScanMessage] = useState<string | null>(null);
+  const [confirmClearScans, setConfirmClearScans] = useState(false);
   const [sharedSnapshot] = useState(() => decodeShareFromLocation());
 
   // A #s=... link opens straight into a read-only view of that snapshot —
@@ -147,10 +149,11 @@ function App() {
     if (activeBill.receiptImages.length === 0 && activeBill.items.every((it) => !it.sourceImageId)) {
       return;
     }
-    const ok = confirm(
-      'Start afresh: remove all scanned receipt photos and the items they added? Manually added items are kept.',
-    );
-    if (!ok) return;
+    setConfirmClearScans(true);
+  }
+
+  function doClearScans() {
+    setConfirmClearScans(false);
     setScanMessage(null);
     updateActiveBill((bill) => ({
       items: bill.items.filter((it) => !it.sourceImageId),
@@ -246,6 +249,14 @@ function App() {
               <button type="button" className="btn danger-outline" onClick={handleClearScans}>
                 Start afresh — clear scanned receipts
               </button>
+            )}
+            {confirmClearScans && (
+              <ConfirmDialog
+                message="Start afresh: remove all scanned receipt photos and the items they added? Manually added items are kept."
+                confirmLabel="Start afresh"
+                onConfirm={doClearScans}
+                onCancel={() => setConfirmClearScans(false)}
+              />
             )}
             <h2 className="items-heading">Items</h2>
             <ItemsEditor

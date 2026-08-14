@@ -149,6 +149,41 @@
   padding: 8px 14px;
 }
 
+.btn.danger {
+  border-color: var(--danger);
+  background: var(--danger);
+  color: white;
+}
+
+.confirm-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 60;
+}
+
+.confirm-modal {
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 18px;
+  max-width: min(380px, 100%);
+}
+
+.confirm-modal p {
+  margin: 0 0 16px;
+  line-height: 1.4;
+}
+
+.confirm-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 /* Event & bills */
 .event-fields {
   display: flex;

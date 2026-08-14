@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import type { Bill, EventInfo } from '../types';
 import { subtotal, formatCurrency } from '../lib/split';
 import { formatDate } from '../lib/util';
+import ConfirmDialog from './ConfirmDialog';
 
 interface Props {
   event: EventInfo;
@@ -27,6 +29,8 @@ export default function EventManager({
   onDateBill,
   onDeleteBill,
 }: Props) {
+  const [pendingDeleteBill, setPendingDeleteBill] = useState<{ id: string; name: string } | null>(null);
+
   return (
     <div className="event-manager">
       <div className="event-fields">
@@ -114,9 +118,7 @@ export default function EventManager({
                     aria-label={`Delete ${bill.name}`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (confirm(`Delete "${bill.name}"? This removes its items and scanned receipts.`)) {
-                        onDeleteBill(bill.id);
-                      }
+                      setPendingDeleteBill({ id: bill.id, name: bill.name });
                     }}
                   >
                     ×
@@ -131,6 +133,18 @@ export default function EventManager({
       <button type="button" className="btn" onClick={onAddBill}>
         + Add smaller event
       </button>
+
+      {pendingDeleteBill && (
+        <ConfirmDialog
+          message={`Delete "${pendingDeleteBill.name}"? This removes its items and scanned receipts.`}
+          confirmLabel="Delete"
+          onConfirm={() => {
+            onDeleteBill(pendingDeleteBill.id);
+            setPendingDeleteBill(null);
+          }}
+          onCancel={() => setPendingDeleteBill(null)}
+        />
+      )}
     </div>
   );
 }

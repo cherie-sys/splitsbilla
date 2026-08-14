@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Person } from '../types';
 import { makeId, nextColor, findByName } from '../lib/util';
+import ConfirmDialog from './ConfirmDialog';
 
 interface Props {
   roster: Person[]; // everyone ever added, across the whole event
@@ -11,6 +12,7 @@ interface Props {
 
 export default function PeopleManager({ roster, selectedIds, onRosterChange, onSelectionChange }: Props) {
   const [name, setName] = useState('');
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; name: string } | null>(null);
 
   function toggle(id: string) {
     const has = selectedIds.includes(id);
@@ -33,8 +35,13 @@ export default function PeopleManager({ roster, selectedIds, onRosterChange, onS
   }
 
   function deleteFromRoster(id: string, personName: string) {
-    if (!confirm(`Remove ${personName} everywhere — from every bill and item they're part of?`)) return;
-    onRosterChange(roster.filter((p) => p.id !== id));
+    setPendingDelete({ id, name: personName });
+  }
+
+  function confirmDelete() {
+    if (!pendingDelete) return;
+    onRosterChange(roster.filter((p) => p.id !== pendingDelete.id));
+    setPendingDelete(null);
   }
 
   return (
@@ -90,6 +97,15 @@ export default function PeopleManager({ roster, selectedIds, onRosterChange, onS
         </datalist>
         <button type="submit" className="btn">Add</button>
       </form>
+
+      {pendingDelete && (
+        <ConfirmDialog
+          message={`Remove ${pendingDelete.name} everywhere — from every bill and item they're part of?`}
+          confirmLabel="Remove"
+          onConfirm={confirmDelete}
+          onCancel={() => setPendingDelete(null)}
+        />
+      )}
     </div>
   );
 }
