@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { AppState, Bill, Person } from '../types';
 import { buildBillReport, buildEventReport } from '../lib/export';
 import { buildBillSnapshot, buildEventSnapshot, buildShareUrl } from '../lib/share';
@@ -21,12 +21,20 @@ export default function ExportPanel({ state, bill, people, onOwnerContactChange 
   const text = scope === 'event' ? buildEventReport(state) : buildBillReport(bill, people, state.currency);
   const title = scope === 'event' ? state.event.name : bill.name;
 
-  const shareUrl = useMemo(() => {
+  const [shareUrl, setShareUrl] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
     const snapshot =
       scope === 'event'
         ? buildEventSnapshot(state)
         : buildBillSnapshot(bill, people, state.currency, state.ownerContact);
-    return buildShareUrl(snapshot);
+    buildShareUrl(snapshot).then((url) => {
+      if (!cancelled) setShareUrl(url);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [scope, state, bill, people]);
 
   async function handleCopy() {
@@ -114,10 +122,10 @@ export default function ExportPanel({ state, bill, people, onOwnerContactChange 
             type="text"
             readOnly
             className="share-link-input"
-            value={shareUrl}
+            value={shareUrl || 'Preparing link…'}
             onFocus={(e) => e.target.select()}
           />
-          <button type="button" className="btn" onClick={handleCopyLink}>
+          <button type="button" className="btn" onClick={handleCopyLink} disabled={!shareUrl}>
             {linkCopied ? 'Copied ✓' : 'Copy link'}
           </button>
         </div>

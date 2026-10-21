@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import './App.css';
 import EventManager from './components/EventManager';
 import PeopleManager from './components/PeopleManager';
@@ -16,7 +16,7 @@ import { useAppState, newBill } from './hooks/useAppState';
 import { makeId } from './lib/util';
 import { billTotal, subtotal } from './lib/split';
 import { mergeParsedItems } from './lib/dedupe';
-import { decodeShareFromLocation } from './lib/share';
+import { decodeShareFromLocation, type SharedSnapshot } from './lib/share';
 import type { Bill, Person } from './types';
 import type { ParsedReceipt } from './lib/parseReceipt';
 
@@ -27,10 +27,21 @@ function App() {
   const [step, setStep] = useState<number>(0);
   const [scanMessage, setScanMessage] = useState<string | null>(null);
   const [confirmClearScans, setConfirmClearScans] = useState(false);
-  const [sharedSnapshot] = useState(() => decodeShareFromLocation());
+  const isShareLink = /^#[sz]=/.test(window.location.hash);
+  const [sharedSnapshot, setSharedSnapshot] = useState<SharedSnapshot | null>(null);
+  const [shareChecked, setShareChecked] = useState(!isShareLink);
+
+  useEffect(() => {
+    if (!isShareLink) return;
+    decodeShareFromLocation().then((snap) => {
+      setSharedSnapshot(snap);
+      setShareChecked(true);
+    });
+  }, [isShareLink]);
 
   // A #s=... link opens straight into a read-only view of that snapshot —
   // it never touches this browser's own bills/people/localStorage.
+  if (!shareChecked) return null;
   if (sharedSnapshot) {
     return <SharedView snapshot={sharedSnapshot} />;
   }

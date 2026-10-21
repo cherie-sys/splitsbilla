@@ -33,142 +33,239 @@ function buildDisputeMailto(snapshot: SharedSnapshot, name: string, message: str
 }
 
 export default function SharedView({ snapshot }: Props) {
-  const { currency } = snapshot;
+  const { currency, people, payments } = snapshot;
+  const [me, setMe] = useState<string | null>(null);
   const [showDisputeForm, setShowDisputeForm] = useState(false);
-  const [disputeName, setDisputeName] = useState('');
+  const [disputeName, setDisputeName] = useState<string | null>(null);
   const [disputeMessage, setDisputeMessage] = useState('');
 
+  const myPerson = people.find((p) => p.name === me);
+  const myItems =
+    snapshot.kind === 'bill' && me
+      ? snapshot.items.flatMap((item) => {
+          const mine = item.people.find((p) => p.name === me);
+          return mine ? [{ name: item.name, share: mine.share }] : [];
+        })
+      : [];
+  const myCharges = myPerson ? myPerson.total - myItems.reduce((sum, i) => sum + i.share, 0) : 0;
+  const iOwe = payments?.filter((p) => p.from === me) ?? [];
+  const owedToMe = payments?.filter((p) => p.to === me) ?? [];
+  const peopleTotal = people.reduce((sum, p) => sum + p.total, 0) || 1;
+  const nameForDispute = disputeName ?? me ?? '';
+
   return (
-    <div className="app-shell">
-      <header className="app-header">
-        <h1>SplitsBilla</h1>
-        <p className="tagline">Shared settlement — view only</p>
+    <div className="app-shell share-shell">
+      <header className="share-hero">
+        <p className="share-eyebrow">
+          {snapshot.kind === 'event' ? 'Event' : 'Bill'}
+          {snapshot.subtitle ? ` · ${snapshot.subtitle}` : ''}
+        </p>
+        <h1 className="share-title">{snapshot.title}</h1>
+        <p className="share-total">{money(snapshot.total, currency)}</p>
+        <p className="share-sub">
+          split between {people.length} {people.length === 1 ? 'person' : 'people'}
+        </p>
       </header>
 
-      <main className="app-main">
-        <section className="panel">
-          <h2>{snapshot.title}</h2>
-          {snapshot.subtitle && <p className="hint shared-subtitle">{snapshot.subtitle}</p>}
+      <main className="app-main share-main">
+        <section className="share-card">
+          <h2 className="share-h">Who are you?</h2>
+          <div className="share-who">
+            {people.map((p) => (
+              <button
+                type="button"
+                key={p.name}
+                aria-pressed={me === p.name}
+                className={`share-who-btn ${me === p.name ? 'active' : ''}`}
+                style={{ '--chip-color': p.color } as React.CSSProperties}
+                onClick={() => setMe(me === p.name ? null : p.name)}
+              >
+                <span className="chip-dot" />
+                {p.name}
+              </button>
+            ))}
+          </div>
 
-          {snapshot.kind === 'bill' && (
-            <>
-              <h3 className="bills-heading">Items</h3>
-              <div className="shared-items">
-                {snapshot.items.length === 0 && <p className="hint">No items on this bill.</p>}
-                {snapshot.items.map((item, i) => (
-                  <div className="shared-item-row" key={i}>
-                    <div className="shared-item-top">
+          {myPerson ? (
+            <div className="share-me">
+              <p className="share-me-label">Your share</p>
+              <p className="share-me-amount">{money(myPerson.total, currency)}</p>
+              {myPerson.statusLabel && <p className="share-me-status">{myPerson.statusLabel}</p>}
+
+              {iOwe.map((p) => (
+                <p className="share-me-action owe" key={`${p.from}-${p.to}`}>
+                  Pay {p.to} <strong>{money(p.amount, currency)}</strong>
+                </p>
+              ))}
+              {owedToMe.map((p) => (
+                <p className="share-me-action owed" key={`${p.from}-${p.to}`}>
+                  {p.from} owes you <strong>{money(p.amount, currency)}</strong>
+                </p>
+              ))}
+              {payments && iOwe.length === 0 && owedToMe.length === 0 && (
+                <p className="share-me-action settled">You're all settled up.</p>
+              )}
+
+              {myItems.length > 0 && (
+                <ul className="share-me-items">
+                  {myItems.map((item, i) => (
+                    <li key={i}>
+                      <span>{item.name}</span>
+                      <span>{money(item.share, currency)}</span>
+                    </li>
+                  ))}
+                  {Math.abs(myCharges) > 0.005 && (
+                    <li>
+                      <span>Tax &amp; charges</span>
+                      <span>{money(myCharges, currency)}</span>
+                    </li>
+                  )}
+                </ul>
+              )}
+            </div>
+          ) : (
+            <p className="hint">Tap your name to see just your part.</p>
+          )}
+        </section>
+
+        <section className="share-card">
+          <h2 className="share-h">Everyone's share</h2>
+          <ul className="share-people">
+            {people.map((p) => (
+              <li key={p.name} className={`share-person ${me === p.name ? 'me' : ''}`}>
+                <span
+                  className="share-avatar"
+                  style={{ '--chip-color': p.color } as React.CSSProperties}
+                  aria-hidden="true"
+                >
+                  {p.name.charAt(0).toUpperCase()}
+                </span>
+                <div className="share-person-main">
+                  <div className="share-person-top">
+                    <span className="share-person-name">{p.name}</span>
+                    <span className="share-person-amount">{money(p.total, currency)}</span>
+                  </div>
+                  <div className="share-bar" aria-hidden="true">
+                    <span
+                      style={{
+                        width: `${Math.max(2, (p.total / peopleTotal) * 100)}%`,
+                        '--chip-color': p.color,
+                      } as React.CSSProperties}
+                    />
+                  </div>
+                  {p.statusLabel && <span className="share-person-status">{p.statusLabel}</span>}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        {payments && (
+          <section className="share-card">
+            <h2 className="share-h">Settle up</h2>
+            {payments.length === 0 ? (
+              <p className="hint">Nothing to pay — everyone's even.</p>
+            ) : (
+              <ul className="share-payments">
+                {payments.map((p) => (
+                  <li key={`${p.from}-${p.to}`} className={p.from === me || p.to === me ? 'me' : ''}>
+                    <span>
+                      <strong>{p.from}</strong> pays <strong>{p.to}</strong>
+                    </span>
+                    <span className="share-payment-amount">{money(p.amount, currency)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        )}
+
+        <details className="share-card share-details">
+          <summary>
+            {snapshot.kind === 'event'
+              ? `Bills in this event (${snapshot.bills.length})`
+              : `What's on the bill (${snapshot.items.length})`}
+          </summary>
+          <ul className="share-lines">
+            {snapshot.kind === 'bill'
+              ? snapshot.items.map((item, i) => (
+                  <li key={i}>
+                    <div className="share-line-top">
                       <span>{item.name}</span>
                       <span>{money(item.total, currency)}</span>
                     </div>
-                    <p className="hint shared-item-who">
+                    <span className="share-line-who">
                       {item.people.length === 0
                         ? 'Unassigned'
                         : item.people
                             .map((p) => (item.people.length > 1 ? `${p.name} (${money(p.share, currency)})` : p.name))
                             .join(', ')}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-
-          {snapshot.kind === 'event' && (
-            <>
-              <h3 className="bills-heading">Bills in this event</h3>
-              <div className="shared-items">
-                {snapshot.bills.map((bill, i) => (
-                  <div className="shared-item-row" key={i}>
-                    <div className="shared-item-top">
+                    </span>
+                  </li>
+                ))
+              : snapshot.bills.map((bill, i) => (
+                  <li key={i}>
+                    <div className="share-line-top">
                       <span>{bill.name}</span>
                       <span>{money(bill.total, currency)}</span>
                     </div>
-                    {bill.date && <p className="hint shared-item-who">{bill.date}</p>}
-                  </div>
+                    {bill.date && <span className="share-line-who">{bill.date}</span>}
+                  </li>
                 ))}
-              </div>
-            </>
-          )}
+          </ul>
+        </details>
 
-          <h3 className="bills-heading">Who owes what</h3>
-          <div className="summary-list">
-            {snapshot.people.map((p, i) => (
-              <div className="summary-row" key={i}>
-                <div className="summary-name-col">
-                  <div className="summary-name">
-                    <span className="chip-dot" style={{ '--chip-color': p.color } as React.CSSProperties} />
-                    {p.name}
-                  </div>
-                  {p.statusLabel && <span className="owes-line">{p.statusLabel}</span>}
-                </div>
-                <div className="summary-total">{money(p.total, currency)}</div>
-              </div>
-            ))}
-          </div>
-
-          <div className="summary-footer">
-            <span>{snapshot.kind === 'event' ? 'Event total' : 'Bill total'}</span>
-            <strong>{money(snapshot.total, currency)}</strong>
-          </div>
-
-          <p className="hint shared-disclaimer">
-            This is a snapshot from when the link was made — it won't update if the bill changes
-            afterward.
-          </p>
-
-          <div className="dispute-section">
-            {!showDisputeForm ? (
-              <button type="button" className="btn danger-outline" onClick={() => setShowDisputeForm(true)}>
-                Raise a dispute
-              </button>
-            ) : (
-              <div className="dispute-form">
-                <h3 className="bills-heading">Raise a dispute</h3>
+        <section className="share-footer">
+          {!showDisputeForm ? (
+            <button type="button" className="btn" onClick={() => setShowDisputeForm(true)}>
+              Something look off? Raise a dispute
+            </button>
+          ) : (
+            <div className="dispute-form">
+              <h3 className="share-h">Raise a dispute</h3>
+              <p className="hint">
+                This opens a draft in your own email app, addressed to whoever shared this — nothing is
+                sent until you hit send there.
+              </p>
+              {!snapshot.ownerContact && (
                 <p className="hint">
-                  This opens a draft in your own email app, addressed to whoever shared this link —
-                  nothing is sent until you hit send there.
+                  They didn't add a contact email, so you'll need to fill in the recipient yourself.
                 </p>
-                {!snapshot.ownerContact && (
-                  <p className="hint">
-                    They didn't add a contact email to this link, so you'll need to fill in the
-                    recipient yourself once your email app opens.
-                  </p>
-                )}
-                <label className="owner-contact-label">
-                  Your name (optional)
-                  <input
-                    type="text"
-                    className="owner-contact-input"
-                    value={disputeName}
-                    onChange={(e) => setDisputeName(e.target.value)}
-                    placeholder="Your name"
-                  />
-                </label>
-                <label className="owner-contact-label">
-                  What's the issue?
-                  <textarea
-                    className="dispute-message-input"
-                    value={disputeMessage}
-                    onChange={(e) => setDisputeMessage(e.target.value)}
-                    placeholder="e.g. I think I was charged for an item I didn't have"
-                    rows={4}
-                  />
-                </label>
-                <div className="export-actions">
-                  <a
-                    className="btn primary"
-                    href={buildDisputeMailto(snapshot, disputeName, disputeMessage)}
-                  >
-                    Open email to send →
-                  </a>
-                  <button type="button" className="btn" onClick={() => setShowDisputeForm(false)}>
-                    Cancel
-                  </button>
-                </div>
+              )}
+              <label className="owner-contact-label">
+                Your name
+                <input
+                  type="text"
+                  className="owner-contact-input"
+                  value={nameForDispute}
+                  onChange={(e) => setDisputeName(e.target.value)}
+                  placeholder="Your name"
+                />
+              </label>
+              <label className="owner-contact-label">
+                What's the issue?
+                <textarea
+                  className="dispute-message-input"
+                  value={disputeMessage}
+                  onChange={(e) => setDisputeMessage(e.target.value)}
+                  placeholder="e.g. I think I was charged for an item I didn't have"
+                  rows={4}
+                />
+              </label>
+              <div className="export-actions">
+                <a className="btn primary" href={buildDisputeMailto(snapshot, nameForDispute, disputeMessage)}>
+                  Open email to send
+                </a>
+                <button type="button" className="btn" onClick={() => setShowDisputeForm(false)}>
+                  Cancel
+                </button>
               </div>
-            )}
-          </div>
+            </div>
+          )}
+          <p className="hint share-note">
+            A snapshot from when the link was made — it won't update if the bill changes afterward.
+          </p>
+          <p className="share-brand">Split with SplitsBilla</p>
         </section>
       </main>
     </div>
