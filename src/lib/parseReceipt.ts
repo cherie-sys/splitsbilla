@@ -29,13 +29,17 @@ const PREPRICE_QTY_RE = /(\d{1,3})\s*[xX@]\s*$/;
 const DECIMAL_MONEY_RE = /\d{1,6}[.,]\d{2}/g;
 // a whole-number price at the very end of a line — used as a fallback for currencies
 // (like INR, JPY) whose receipts commonly print amounts with no decimal at all.
-// Not preceded by another digit (so "4521" isn't split) and non-digit text after it
-// ("/-", "Rs", "INR", "₹", or nothing at all — "Rs.50" has no space before the number)
-// is allowed; only another digit after it disqualifies the match (it was really a date).
-const WHOLE_MONEY_TRAILING_RE = /(?<!\d)(\d{2,6})\D*$/;
+// Not preceded by another digit (so "4521" isn't split), and only a genuine
+// currency-ish suffix after it is allowed — "/-", "Rs", "INR", "₹", trailing
+// punctuation, or nothing at all ("Rs.50" has no space before the number).
+// Crucially this does NOT allow arbitrary letters after the number: a wrapped
+// item-name continuation line like "White 150ml[sf]" (from "...White 150ml[sf]"
+// wrapping under a long dish name) must NOT read "150" as a price just because
+// "ml[sf]" happens to follow it — that's a unit of measure, not currency.
+const WHOLE_MONEY_TRAILING_RE = /(?<!\d)(\d{2,6})(?:\s*(?:\/-|rs\.?|inr|usd|₹|\$))?[.,\s)\]]*$/i;
 
 const SKIP_NOISE_RE =
-  /\b(cash|change|visa|mastercard|amex|discover|debit|credit|card ending|approval|auth code|thank you|receipt|table|server|host|guest|order\s*#|check\s*#|xxxx|items sold|qty|www\.|http|date|time|phone|tel|bill\s*no|invoice|token|covers?|pax|gstin|fssai|kot|dine\s*in|round\s*-?\s*off|rounding)\b/i;
+  /\b(cash|change|visa|mastercard|amex|discover|debit|credit|card ending|approval|auth code|thank you|receipt|table|server|host|guest|order\s*#|check\s*#|xxxx|items sold|qty|www\.|http|date|time|phone|tel|ph\.?\s*no|bill\s*no|invoice|token|covers?|pax|gstin|fssai|kot|dine\s*in|round\s*-?\s*off|rounding)\b/i;
 
 // CGST/SGST/IGST are India's split GST tax lines; VAT covers several other countries
 const TAX_RE = /\btax\b|\b[csi]?gst\b|\bvat\b/i;

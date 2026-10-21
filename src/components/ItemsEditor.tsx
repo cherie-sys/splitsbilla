@@ -32,6 +32,15 @@ export default function ItemsEditor({ items, people, currency, onChange }: Props
     onChange([...items, { id: makeId(), name: '', price: 0, qty: 1, assignedTo: [] }]);
   }
 
+  // Shortcut for the common case — everyone's splitting the whole bill
+  // evenly — instead of tapping "Split all" on every item one at a time.
+  function splitEntireBillEvenly() {
+    const everyone = people.map((p) => p.id);
+    onChange(
+      items.map((it) => ({ ...it, assignedTo: everyone, customShares: undefined, customSplitMode: undefined })),
+    );
+  }
+
   function toggleAssignee(item: Item, personId: string) {
     const has = item.assignedTo.includes(personId);
     const assignedTo = has
@@ -47,14 +56,14 @@ export default function ItemsEditor({ items, people, currency, onChange }: Props
     updateItem(item.id, { assignedTo, customShares });
   }
 
-  function useEvenSplit(item: Item) {
+  function applyEvenSplit(item: Item) {
     updateItem(item.id, { customShares: undefined, customSplitMode: undefined });
   }
 
   // Seeds a fresh, balanced starting point for the chosen mode — amounts or
   // servings both split evenly in decimal (e.g. 5 fries between 2 people
   // seeds 2.5 each), which is then editable down to whole or partial units.
-  function useCustomSplit(item: Item, mode: 'amount' | 'qty') {
+  function applyCustomSplit(item: Item, mode: 'amount' | 'qty') {
     if (item.customShares && item.customSplitMode === mode) return;
     const n = item.assignedTo.length;
     const seeded: Record<string, number> = {};
@@ -73,6 +82,12 @@ export default function ItemsEditor({ items, people, currency, onChange }: Props
     <div className="items-editor">
       {items.length === 0 && (
         <p className="hint">No items yet. Scan a receipt or add items manually.</p>
+      )}
+
+      {items.length > 0 && people.length > 0 && (
+        <button type="button" className="btn split-bill-btn" onClick={splitEntireBillEvenly}>
+          Split entire bill evenly among everyone
+        </button>
       )}
 
       {items.length > 0 && (
@@ -183,14 +198,14 @@ export default function ItemsEditor({ items, people, currency, onChange }: Props
                 <button
                   type="button"
                   className={`split-mode-btn ${!item.customShares ? 'active' : ''}`}
-                  onClick={() => useEvenSplit(item)}
+                  onClick={() => applyEvenSplit(item)}
                 >
                   Split evenly
                 </button>
                 <button
                   type="button"
                   className={`split-mode-btn ${item.customShares && !isQtyMode ? 'active' : ''}`}
-                  onClick={() => useCustomSplit(item, 'amount')}
+                  onClick={() => applyCustomSplit(item, 'amount')}
                 >
                   Customize split
                 </button>
@@ -198,7 +213,7 @@ export default function ItemsEditor({ items, people, currency, onChange }: Props
                   <button
                     type="button"
                     className={`split-mode-btn ${isQtyMode ? 'active' : ''}`}
-                    onClick={() => useCustomSplit(item, 'qty')}
+                    onClick={() => applyCustomSplit(item, 'qty')}
                   >
                     By quantity
                   </button>
